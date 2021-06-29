@@ -83,6 +83,7 @@ NATIVE_ALLOW_LIST = [
     'PulseDecisionMaking',
     'Reaching1D',
     'Reaching1DWithSelfDistraction',
+    'Reaching2D',
     'ReachingDelayResponse',
     'ReadySetGo',
     'SingleContextDecisionMaking',
