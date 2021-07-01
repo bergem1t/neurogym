@@ -69,8 +69,8 @@ class Reaching2D(ngym.TrialEnv):
         # whether or not the stim stays on
         self.mem = mem
         # tracking the current position
-        self.pos = 0
-        self.vel = np.zeros(int(self.tmax/self.dt))
+        self.pos = [0, 0]
+        self.vel = np.zeros([2,int(self.tmax/self.dt)])
         self.reset_pos=reset_pos
 
         # Rewards (different kinds possible)
@@ -94,16 +94,16 @@ class Reaching2D(ngym.TrialEnv):
 
         # define spaces
         name = {'fix': 0, 'x': 1}
-        self.observation_space = spaces.Box(low=np.array([0.0, -box_size]),
-                                            high=np.array([1.0, box_size]),
-                                            dtype=np.float32, name=name)
+        self.observation_space = spaces.Box(low=np.array([0.0, -box_size, -box_size]),
+                                            high=np.array([1.0, box_size, box_size]))#,
+                                            #dtype=np.float32, name=name)
         
         # action space has one dimension less bc it does not produce fix
         # action will be speed
         self.action_space = spaces.Box(low=-box_size,
                                        high=box_size,
-                                       shape=(1,),
-                                       dtype=np.float32)
+                                       shape=(2,))#,
+                                       #dtype=np.float32)
 
     def _new_trial(self, **kwargs):
         # Trial
@@ -112,7 +112,8 @@ class Reaching2D(ngym.TrialEnv):
         # this would be the position x,y
         # for now only x = ground_truth
         trial = {
-            'ground_truth': self.rng.uniform(-self.box_size, self.box_size)
+            'ground_truth': [self.rng.uniform(-self.box_size, self.box_size),
+                             self.rng.uniform(-self.box_size, self.box_size)]
         }
         trial.update(kwargs)
         stim_pos = trial['ground_truth']
@@ -129,17 +130,17 @@ class Reaching2D(ngym.TrialEnv):
         
         # does the stimulus stay on ruding memory period?
         if self.mem:
-            mem_stim_pos = 0
+            mem_stim_pos = [0, 0]
         else:
             mem_stim_pos = stim_pos
                         
         # set obesrvations
-        self.set_ob([1, stim_pos], 'stimulus')
-        self.set_ob([1, mem_stim_pos], 'delay')
-        self.set_ob([0, mem_stim_pos], 'movement')
+        self.set_ob([1, stim_pos[0], stim_pos[1]], 'stimulus')
+        self.set_ob([1, mem_stim_pos[0], mem_stim_pos[1]], 'delay')
+        self.set_ob([0, mem_stim_pos[0], mem_stim_pos[1]], 'movement')
 
         # set ground truth
-        self.set_groundtruth(0, ['stimulus', 'delay'])
+        self.set_groundtruth([0,0], ['stimulus', 'delay'])
         
         # speed profile from current pos to new pos
         # now as a test just direction +-1
@@ -149,9 +150,10 @@ class Reaching2D(ngym.TrialEnv):
         mu_gauss = move_i_dur/2.0
         sd_gauss = move_i_dur/8.0
         gauss_dist = gauss(np.arange(move_i_dur),mu=mu_gauss,sd=sd_gauss)
-        move_speed = stim_pos*gauss_dist/sum(gauss_dist)
-        move_speed = np.expand_dims(move_speed, 1)
-        self.set_groundtruth(move_speed, 'movement')
+        move_speed = np.matmul(np.array(stim_pos).reshape((len(stim_pos),1)),
+                               gauss_dist.reshape((1,len(gauss_dist)))/sum(gauss_dist))
+        #move_speed = np.expand_dims(move_speed, 1)
+        self.set_groundtruth(move_speed.T, 'movement')
 
         return trial
 
@@ -169,12 +171,12 @@ class Reaching2D(ngym.TrialEnv):
 
         # track velocity
         i_now = int(self.t/self.dt)
-        self.vel[i_now] = action
+        self.vel[:,i_now] = action
         
 
         # track position
         if (self.t == 0) & self.reset_pos:
-            self.pos = 0
+            self.pos = [0,0]
         else:
             self.pos += action
             
@@ -192,8 +194,8 @@ class Reaching2D(ngym.TrialEnv):
         
         if ob[0] == 1:
             # not in movement period
-            # abort if movemet hallens
-            if action > 0.1:
+            # abort if movemet happens
+            if action > 0.001:
                 new_trial = self.abort
                 reward = self.rewards['fail']
 
