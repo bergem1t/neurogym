@@ -73,6 +73,7 @@ NATIVE_ALLOW_LIST = [
     'HierarchicalReasoning',
     'IntervalDiscrimination',
     'MotorTiming',
+    'Movementsequence',
     'MultiSensoryIntegration',
     'Null',
     'OneTwoThreeGo',

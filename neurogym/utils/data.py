@@ -82,19 +82,39 @@ class Dataset(object):
         self.max_batch = max_batch
 
     def _cache(self, **kwargs):
+        """
+        For each environment (we have batch_size environments), generate new trails and concatenate
+        them as long as it fits into the cache length.
+        
+        In the end _seq_start will be set to 0 and _seq_end to initially defined seq_len
+  
+        Parameters
+        ----------
+        **kwargs : TYPE
+          Arguments for env.new_trial(**kwargs).
+  
+        Returns
+        -------
+        None.
+  
+        """
+      
+        # loop over each environment
         for i in range(self.batch_size):
             env = self.envs[i]
             seq_start = 0
             seq_end = 0
+            # loop until we filled the cache
             while seq_end < self._cache_len:
                 # TODO: Right now this only works for env with new_trial
                 env.new_trial(**kwargs)
-                ob, gt = env.ob, env.gt
+                ob, gt = env.ob, env.gt # here we have the new trial data
                 seq_len = ob.shape[0]
                 seq_end = seq_start + seq_len
                 if seq_end > self._cache_len:
                     seq_end = self._cache_len
                     seq_len = seq_end - seq_start
+                # add the new data to the cache
                 if self.batch_first:
                     self._inputs[i, seq_start:seq_end, ...] = ob[:seq_len]
                     self._target[i, seq_start:seq_end, ...] = gt[:seq_len]
@@ -103,6 +123,7 @@ class Dataset(object):
                     self._target[seq_start:seq_end, i, ...] = gt[:seq_len]
                 seq_start = seq_end
 
+        # reset current sequence position
         self._seq_start = 0
         self._seq_end = self._seq_start + self.seq_len
 
@@ -110,19 +131,62 @@ class Dataset(object):
         return self
 
     def __call__(self, *args, **kwargs):
+        """
+        Wrapper for __next__
+  
+        Parameters
+        ----------
+        *args : TYPE
+          DESCRIPTION.
+        **kwargs : TYPE
+          DESCRIPTION.
+  
+        Returns
+        -------
+        TYPE
+          DESCRIPTION.
+  
+        """
         return self.__next__(**kwargs)
 
     def __next__(self, **kwargs):
+        """
+        Generate a new batch of data.
+  
+        Parameters
+        ----------
+        **kwargs : TYPE
+          DESCRIPTION.
+  
+        Raises
+        ------
+        StopIteration
+          DESCRIPTION.
+  
+        Returns
+        -------
+        inputs : TYPE
+          DESCRIPTION.
+        target : TYPE
+          DESCRIPTION.
+
+        """
+        
+      
+        # increase batch number
         self._i_batch += 1
         if self._i_batch > self.max_batch:
             self._i_batch = 0
             raise StopIteration
 
+        # define sequence end based on start and defined length
         self._seq_end = self._seq_start + self.seq_len
 
+        # if end exceeds cache, cahe new data
         if self._seq_end >= self._cache_len:
             self._cache(**kwargs)
 
+        # take input and target for current sequence out of the cache
         if self.batch_first:
             inputs = self._inputs[:, self._seq_start:self._seq_end, ...]
             target = self._target[:, self._seq_start:self._seq_end, ...]
@@ -130,6 +194,7 @@ class Dataset(object):
             inputs = self._inputs[self._seq_start:self._seq_end]
             target = self._target[self._seq_start:self._seq_end]
 
+        # move sequence along
         self._seq_start = self._seq_end
         return inputs, target
         # return inputs, np.expand_dims(target, axis=2)

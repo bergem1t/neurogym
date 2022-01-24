@@ -82,6 +82,8 @@ def run_env(env, num_steps=200, num_trials=None, def_act=None, model=None):
                 action = [action]
             if len(_states) > 0:
                 state_mat.append(_states)
+        elif def_act == 0:
+            action = env.action_space.sample()*0
         elif def_act is not None:
             action = def_act
         else:
