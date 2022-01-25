@@ -356,20 +356,22 @@ class Movementsequence(ngym.TrialEnv):
         # define spaces
         name = {'fixation': 0}
         i_stim_dim = 1
-        fix_low = [0.0]
-        fix_high = [1.0]
+        stim_low = [0.0]
+        stim_high = [1.0]
         if context:
           name['context'] = i_stim_dim
           i_stim_dim += 1  
-          fix_low *= 2
-          fix_high *= 2
+          stim_low += [0.0]
+          stim_high += [1.0]
         for k,i in self.movement.param_isvar.items():
           if i:
             name[k] = list(np.arange(n_action_dim) + i_stim_dim)
             i_stim_dim += n_action_dim
+            stim_low += [min(p) for p in self.movement.param[k]]
+            stim_high += [max(p) for p in self.movement.param[k]]
         self.obs_name = name
-        self.observation_space = spaces.Box(low=np.array(fix_low + [-self.box_size for i in range(n_stim_dim)],dtype=np.float32),
-                                            high=np.array(fix_high + [self.box_size for i in range(n_stim_dim)],dtype=np.float32),
+        self.observation_space = spaces.Box(low=np.array(stim_low,dtype=np.float32),
+                                            high=np.array(stim_high,dtype=np.float32),
                                             name=name)#,
                                             #dtype=np.float32, name=name)
         
