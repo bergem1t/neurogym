@@ -338,6 +338,10 @@ class Movementsequence(ngym.TrialEnv):
         # stimulus dimensions (without fix and context)
         n_stim_dim = sum([i for _,i in self.movement.param_isvar.items()])*n_action_dim
         
+        # we normalize the stimuli that it is between [-box_size, box-size]
+        self.stim_vars = [k for k,i in self.movement.param_isvar.items() if i]
+        self.stim_absmax = [np.abs(self.movement.param[k]).max() for k in self.stim_vars]
+        
         # tracking the current position
         # Position is not implemented and probaly not necessary if we consider
         # hand-centered coordinates
@@ -363,12 +367,13 @@ class Movementsequence(ngym.TrialEnv):
           i_stim_dim += 1  
           stim_low += [0.0]
           stim_high += [1.0]
-        for k,i in self.movement.param_isvar.items():
-          if i:
-            name[k] = list(np.arange(n_action_dim) + i_stim_dim)
-            i_stim_dim += n_action_dim
-            stim_low += [min(p) for p in self.movement.param[k]]
-            stim_high += [max(p) for p in self.movement.param[k]]
+        for k in self.stim_vars:
+          name[k] = list(np.arange(n_action_dim) + i_stim_dim)
+          i_stim_dim += n_action_dim
+          #stim_low += [min(p) for p in self.movement.param[k]]
+          #stim_high += [max(p) for p in self.movement.param[k]]
+        stim_low += [-1.0]*n_stim_dim
+        stim_high += [1.0]*n_stim_dim
         self.obs_name = name
         self.observation_space = spaces.Box(low=np.array(stim_low,dtype=np.float32),
                                             high=np.array(stim_high,dtype=np.float32),
@@ -428,9 +433,9 @@ class Movementsequence(ngym.TrialEnv):
         move_seq = self.movement.make_sequence(trial)
         context_state = trial['context']
         stim_state = []
-        for k,i in self.movement.param_isvar.items():
-          if i:
-            stim_state.extend(trial[k])
+        for i,k in enumerate(self.stim_vars):
+          cur_state = np.array(trial[k])/self.stim_absmax[i] if self.stim_absmax[i]>0 else [0]*self.movement.ndim
+          stim_state.extend(list(cur_state))
 
         # Setting time periods for this trial
         # Will add stimulus, delay and decision periods sequentially  
